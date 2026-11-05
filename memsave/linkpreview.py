@@ -2,6 +2,8 @@
 
 This is the same mechanism Slack, Telegram and X use for link previews: fetch the
 page as a browser/bot, read the preview metadata, then fetch the image itself.
+For X/Twitter the embed syndication payload is tried first, because it exposes
+the original photo URLs (and the selected /photo/N); OG metadata is the fallback.
 No image found means no record is created.
 """
 
@@ -36,6 +38,12 @@ IMAGE_HEADERS = {
 }
 URL_RE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 PIC_TWITTER_RE = re.compile(r"https?://pic\.twitter\.com/[A-Za-z0-9]+", re.IGNORECASE)
+TWITTER_STATUS_RE = re.compile(
+    r"^https?://(?:www\.|mobile\.)?(?:x|twitter)\.com/(?:[^/]+/status|i/web/status)/(\d+)",
+    re.IGNORECASE,
+)
+TWITTER_PHOTO_RE = re.compile(r"/photo/(\d+)", re.IGNORECASE)
+X_SYNDICATION_URL = "https://cdn.syndication.twimg.com/tweet-result"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".heic", ".heif"}
 
 
@@ -275,10 +283,90 @@ def _try_candidates(candidates: Iterable[str], page_url: str) -> Resolved | None
     return None
 
 
+def _tweet_reference(url: str) -> tuple[str, int | None] | None:
+    match = TWITTER_STATUS_RE.search(url)
+    if not match:
+        return None
+    photo = TWITTER_PHOTO_RE.search(url)
+    return match.group(1), int(photo.group(1)) if photo else None
+
+
+def _x_syndication_media(tweet_id: str) -> tuple[list[str], str | None]:
+    """X's public embed payload carries original photo URLs.
+
+    The regular page may be a login wall, and its og:image is a resized WebP.
+    This endpoint is used by X embeds and returns the actual media URL.
+    """
+    try:
+        with httpx.Client(timeout=config.LINK_TIMEOUT, headers={"User-Agent": BROWSER_UA}) as client:
+            response = client.get(
+                X_SYNDICATION_URL,
+                params={"id": tweet_id, "lang": "en", "token": "memsave"},
+            )
+        if response.status_code != 200:
+            return [], None
+        data = response.json()
+    except (httpx.HTTPError, ValueError, TypeError):
+        return [], None
+    if not isinstance(data, dict):
+        return [], None
+
+    urls: list[str] = []
+    for item in data.get("photos") or []:
+        if not isinstance(item, dict):
+            continue
+        for key in ("url", "media_url_https"):
+            value = item.get(key)
+            if isinstance(value, str) and value.startswith(("http://", "https://")):
+                urls.append(value)
+    for item in data.get("mediaDetails") or []:
+        if not isinstance(item, dict) or item.get("type") != "photo":
+            continue
+        value = item.get("media_url_https")
+        if isinstance(value, str) and value.startswith(("http://", "https://")):
+            urls.append(value)
+
+    unique: list[str] = []
+    for value in urls:
+        if value not in unique:
+            unique.append(value)
+
+    title = data.get("text")
+    if isinstance(title, str):
+        title = " ".join(URL_RE.sub("", title).split())[:300] or None
+        user = data.get("user")
+        if title and isinstance(user, dict) and isinstance(user.get("name"), str):
+            title = f"{user['name']}: {title}"[:300]
+    else:
+        title = None
+    return unique, title
+
+
 def resolve(url: str, *, title_hint: str | None = None) -> Resolved:
     url = url.strip()
     if not url:
         raise NoImage("empty link")
+
+    tweet = _tweet_reference(url)
+    if tweet is not None:
+        tweet_id, photo_index = tweet
+        photos, tweet_title = _x_syndication_media(tweet_id)
+        if photos:
+            if photo_index and 1 <= photo_index <= len(photos):
+                photos = [photos[photo_index - 1]] + [
+                    value for index, value in enumerate(photos, 1) if index != photo_index
+                ]
+            for candidate in photos:
+                resolved = _download_image(candidate, url)
+                if resolved is not None:
+                    return Resolved(
+                        data=resolved.data,
+                        media_type=resolved.media_type,
+                        image_url=resolved.image_url,
+                        page_url=url,
+                        title=tweet_title or title_hint,
+                    )
+
     try:
         # A shared URL may point straight at a large image, so the first fetch
         # allows the image cap; ordinary HTML pages are still parsed with the

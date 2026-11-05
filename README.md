@@ -122,6 +122,9 @@ python -m memsave serve
 - читает `og:image`, `twitter:image`, `link rel=image_src`, JSON-LD;
 - при отсутствии — повторяет запрос с ботом-User-Agent;
 - для X/Twitter есть fallback через oEmbed;
+- для X/Twitter сначала читает публичный embed-syndication (`photos` / `mediaDetails`):
+  это даёт оригинальный URL фото и выбранный `/photo/N`, а если он недоступен — падает
+  обратно на `og:image`;
 - скачивает первую валидную картинку с `Referer` страницы;
 - блокирует private/loopback/link-local адреса, ограничивает редиректы, размер и время.
 

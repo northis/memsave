@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "memsave",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Отправить картинку из контекстного меню в личный архив memsave.",
   "permissions": ["contextMenus", "storage"],
   "host_permissions": [

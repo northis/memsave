@@ -33,6 +33,88 @@ def test_image_candidates_order_and_absolute_urls():
     assert "https://example.com/img/ld.jpg" in candidates
 
 
+def test_tweet_reference_parses_photo_index():
+    assert linkpreview._tweet_reference(
+        "https://x.com/SanchoVoltov_V2/status/2118360223811613070/photo/2?a=1&s=19"
+    ) == ("2118360223811613070", 2)
+    assert linkpreview._tweet_reference(
+        "https://twitter.com/user/status/12345"
+    ) == ("12345", None)
+    assert linkpreview._tweet_reference("https://example.com/post/1") is None
+
+
+def test_x_syndication_media_parses_original_photos(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {
+                "text": "Высокая плотность тела https://t.co/IN5QcxLBqG",
+                "user": {"name": "Автор"},
+                "photos": [
+                    {"url": "https://pbs.twimg.com/media/a.jpg"},
+                    {"url": "https://pbs.twimg.com/media/b.jpg"},
+                ],
+                "mediaDetails": [
+                    {
+                        "type": "photo",
+                        "media_url_https": "https://pbs.twimg.com/media/a.jpg",
+                        "url": "https://t.co/IN5QcxLBqG",
+                    }
+                ],
+            }
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def get(self, url, params=None):
+            return FakeResponse()
+
+    monkeypatch.setattr(linkpreview.httpx, "Client", FakeClient)
+    urls, title = linkpreview._x_syndication_media("123")
+    assert urls == [
+        "https://pbs.twimg.com/media/a.jpg",
+        "https://pbs.twimg.com/media/b.jpg",
+    ]
+    assert title == "Автор: Высокая плотность тела"
+
+
+def test_x_syndication_prefers_selected_original_photo(monkeypatch):
+    monkeypatch.setattr(
+        linkpreview,
+        "_x_syndication_media",
+        lambda tweet_id: (
+            ["https://pbs.twimg.com/media/first.jpg", "https://pbs.twimg.com/media/second.jpg"],
+            "Автор: подпись",
+        ),
+    )
+
+    def fake_download(url, referer):
+        return linkpreview.Resolved(
+            data=b"image",
+            media_type="image/jpeg",
+            image_url=url,
+            page_url=referer,
+            title=None,
+        )
+
+    monkeypatch.setattr(linkpreview, "_download_image", fake_download)
+    resolved = linkpreview.resolve(
+        "https://x.com/SanchoVoltov_V2/status/2118360223811613070/photo/2"
+    )
+    assert resolved.image_url == "https://pbs.twimg.com/media/second.jpg"
+    assert resolved.page_url == "https://x.com/SanchoVoltov_V2/status/2118360223811613070/photo/2"
+    assert resolved.title == "Автор: подпись"
+
+
 def test_resolve_uses_preview_image(monkeypatch):
     page = linkpreview.Fetched(
         url="https://example.com/post/1",
