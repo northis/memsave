@@ -15,14 +15,14 @@ $Service = "memsave"
 $Port = if ($env:MEMSAVE_PORT) { [int]$env:MEMSAVE_PORT } else { 8780 }
 
 function Invoke-Docker {
-    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
-    & docker @Args
-    if ($LASTEXITCODE -ne 0) { throw "docker $($Args -join ' ') failed with exit code $LASTEXITCODE" }
+    param([Parameter(Mandatory = $true)][string[]]$DockerArgs)
+    & docker @DockerArgs
+    if ($LASTEXITCODE -ne 0) { throw "docker $($DockerArgs -join ' ') failed with exit code $LASTEXITCODE" }
 }
 
 function Compose-Exec {
-    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
-    Invoke-Docker @($Compose + @("exec", "-T", $Service) + $Args)
+    param([Parameter(Mandatory = $true)][string[]]$DockerArgs)
+    Invoke-Docker -DockerArgs (@($Compose) + @("exec", "-T", $Service) + $DockerArgs)
 }
 
 function Running-Commit {
@@ -58,8 +58,8 @@ function Restore-Previous {
         return $false
     }
     Write-Host "Restoring memsave:previous ..." -ForegroundColor Yellow
-    Invoke-Docker @("tag", "memsave:previous", "memsave:latest")
-    Invoke-Docker @($Compose + @("up", "-d", "--no-build", $Service))
+    Invoke-Docker -DockerArgs @("tag", "memsave:previous", "memsave:latest")
+    Invoke-Docker -DockerArgs (@($Compose) + @("up", "-d", "--no-build", $Service))
     return $true
 }
 
@@ -76,7 +76,7 @@ if ($Rollback) {
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw "git is not installed" }
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "docker is not installed" }
-Invoke-Docker @("version")
+Invoke-Docker -DockerArgs @("version")
 
 if (-not $SkipFetch) {
     for ($attempt = 1; $attempt -le 3; $attempt++) {
@@ -119,7 +119,7 @@ if (-not $Force -and $running -and $running.StartsWith($target.Substring(0,7))) 
 if (-not $SkipBackup) {
     Write-Host "Backing up the archive before update ..." -ForegroundColor Cyan
     try {
-        Compose-Exec "python" "-m" "memsave" "backup"
+        Compose-Exec -DockerArgs @("python", "-m", "memsave", "backup")
     } catch {
         throw "backup failed; update aborted. Use -SkipBackup only if you have a backup."
     }
@@ -127,7 +127,7 @@ if (-not $SkipBackup) {
 
 & docker image inspect "memsave:latest" 2>$null | Out-Null
 if ($LASTEXITCODE -eq 0) {
-    Invoke-Docker @("tag", "memsave:latest", "memsave:previous")
+    Invoke-Docker -DockerArgs @("tag", "memsave:latest", "memsave:previous")
 }
 
 $short = $target.Substring(0, 7)
@@ -138,7 +138,7 @@ $worktree = Join-Path ([System.IO.Path]::GetTempPath()) ("memsave-build-" + [gui
 try {
     & git -C $Repo worktree add --detach $worktree $target
     if ($LASTEXITCODE -ne 0) { throw "could not create a clean worktree" }
-    Invoke-Docker @(
+    Invoke-Docker -DockerArgs @(
         "build",
         "-t", "memsave:latest",
         "-t", "memsave:$short",
@@ -154,7 +154,7 @@ try {
     }
 }
 
-Invoke-Docker @($Compose + @("up", "-d", "--no-build", $Service))
+Invoke-Docker -DockerArgs (@($Compose) + @("up", "-d", "--no-build", $Service))
 
 if (-not (Wait-Commit -Commit $target)) {
     Write-Host "New container did not report $($target.Substring(0,7)); rolling back." -ForegroundColor Red

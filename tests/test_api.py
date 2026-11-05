@@ -15,7 +15,7 @@ def test_home_version_and_pwa_assets(client):
     assert "app.js?v=" in root.text
     assert client.get("/health").json() == {"status": "ok"}
     version = client.get("/api/version").json()
-    assert version["version"] == "1.0.0"
+    assert version["version"] == "1.0.1"
     manifest = client.get("/manifest.webmanifest")
     assert manifest.status_code == 200
     assert "application/manifest+json" in manifest.headers["content-type"]
@@ -182,4 +182,5 @@ def test_foreign_origin_is_rejected(client, jpeg_bytes):
 def test_path_traversal_is_not_served(client):
     assert client.get("/images/../memsave.db").status_code == 404
     assert client.get("/thumbs/not-a-thumb.webp").status_code == 404
+
 
