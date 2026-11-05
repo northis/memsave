@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#eef8ea">
+  <meta name="description" content="memsave — личный архив картинок и мемов с AI-тегами и поиском.">
+  <title>memsave</title>
+  <script>
+    (function () {
+      var stored = localStorage.getItem("memsave_theme");
+      var dark = stored ? stored === "dark"
+        : !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = dark ? "#0f1712" : "#eef8ea";
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/style.css?v={{VERSION}}">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon-180.png">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/" aria-label="memsave — на главную">
+    <img class="brand-icon" src="/static/favicon.svg" alt="" width="32" height="32">
+    <span class="brand-name">memsave</span>
+  </a>
+
+  <label class="search-wrap">
+    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+    <input id="search" type="search" placeholder="Поиск по мемам, тексту и тегам…"
+           autocomplete="off" spellcheck="false" aria-label="Поиск по архиву">
+    <button id="search-clear" class="search-clear" type="button" title="Очистить поиск" aria-label="Очистить поиск" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg>
+    </button>
+  </label>
+
+  <div class="sort-switch" role="group" aria-label="Сортировка">
+    <button type="button" data-sort="new" class="active">Новые</button>
+    <button type="button" data-sort="old">Старые</button>
+  </div>
+
+  <button id="theme-btn" class="icon-btn" type="button" title="Светлая или тёмная тема" aria-label="Переключить тему">
+    <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+  </button>
+
+  <span class="build" id="build" hidden>
+    <a id="build-version" target="_blank" rel="noopener noreferrer"></a>
+    <span class="build-dot" aria-hidden="true">·</span>
+    <a id="build-commit" target="_blank" rel="noopener noreferrer"></a>
+  </span>
+</header>
+
+<main class="shell">
+  <div class="toolbar">
+    <div class="filter" id="filter" hidden>
+      <span class="filter-label">Тег</span>
+      <button class="tag-chip category" id="filter-tag" type="button"></button>
+      <button class="filter-clear" id="clear-filter" type="button" title="Снять фильтр" aria-label="Снять фильтр">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg>
+      </button>
+    </div>
+    <div class="stats" id="stats">Загрузка…</div>
+    <div class="search-mode" id="search-mode" hidden></div>
+  </div>
+
+  <div class="masonry" id="masonry"></div>
+  <div class="sentinel" id="sentinel" aria-hidden="true"></div>
+
+  <div class="loading" id="loading" hidden>
+    <span class="spinner" aria-hidden="true"></span>
+    <span>Загружаю…</span>
+  </div>
+
+  <section class="empty" id="empty" hidden>
+    <div class="empty-art" aria-hidden="true">
+      <svg viewBox="0 0 120 120" fill="none">
+        <rect x="16" y="22" width="88" height="70" rx="16" stroke="currentColor" stroke-width="4"/>
+        <circle cx="42" cy="46" r="8" fill="currentColor" opacity=".55"/>
+        <path d="M24 80 48 58l16 15 12-11 20 18" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h2>Пока пусто</h2>
+    <p>Вставьте картинку из буфера обмена <kbd>Ctrl</kbd>+<kbd>V</kbd>, перетащите файл или выберите его на устройстве.</p>
+    <button class="btn accent" id="empty-pick" type="button">Выбрать картинку</button>
+  </section>
+</main>
+
+<button class="fab" id="upload-btn" type="button" title="Добавить картинку" aria-label="Добавить картинку">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+</button>
+<input id="file-input" type="file" accept="image/*" multiple hidden>
+
+<div class="drop" id="drop" hidden>
+  <div class="drop-box">
+    <div class="drop-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 20h14"/></svg>
+    </div>
+    <p>Отпустите картинку, чтобы сохранить</p>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Просмотр картинки">
+  <div class="lb-backdrop" data-close></div>
+  <div class="lb-panel">
+    <button class="lb-close" id="lb-close" type="button" aria-label="Закрыть">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"></path></svg>
+    </button>
+    <button class="lb-nav lb-prev" id="lb-prev" type="button" aria-label="Предыдущая">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"></path></svg>
+    </button>
+    <div class="lb-media" id="lb-media">
+      <img id="lb-img" alt="">
+      <div class="lb-pending" id="lb-pending" hidden><span class="spinner"></span><span>AI размечает картинку…</span></div>
+    </div>
+    <button class="lb-nav lb-next" id="lb-next" type="button" aria-label="Следующая">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"></path></svg>
+    </button>
+
+    <aside class="lb-side">
+      <div class="lb-head">
+        <span class="lb-category" id="lb-category"></span>
+        <span class="lb-status" id="lb-status"></span>
+      </div>
+      <h2 class="lb-title" id="lb-title">Картинка</h2>
+      <time class="lb-date" id="lb-date"></time>
+      <p class="lb-description" id="lb-description"></p>
+      <div class="lb-tags" id="lb-tags"></div>
+      <details class="lb-text" id="lb-text-wrap" hidden>
+        <summary>Текст на картинке</summary>
+        <pre id="lb-text"></pre>
+      </details>
+      <div class="lb-actions">
+        <a class="btn ghost" id="lb-source" target="_blank" rel="noopener noreferrer" hidden>Источник</a>
+        <a class="btn ghost" id="lb-download" download>Скачать</a>
+        <button class="btn ghost" id="lb-retry" type="button" hidden>Повторить AI</button>
+        <button class="btn danger" id="lb-delete" type="button">Удалить</button>
+      </div>
+      <div class="lb-meta" id="lb-meta"></div>
+    </aside>
+  </div>
+</div>
+
+<div class="confirm" id="confirm" hidden role="dialog" aria-modal="true" aria-label="Подтверждение удаления">
+  <div class="confirm-box">
+    <h3>Удалить картинку?</h3>
+    <p>Файл, теги и запись в архиве будут удалены. Это действие нельзя отменить.</p>
+    <div class="confirm-actions">
+      <button class="btn ghost" id="confirm-cancel" type="button">Отмена</button>
+      <button class="btn danger" id="confirm-ok" type="button">Удалить</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="/static/app.js?v={{VERSION}}" defer></script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+# Host-only helper for tools/make_icons.py (the runtime image never installs it).
+playwright>=1.40

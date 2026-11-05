@@ -1,3 +1,16 @@
+# memsave data and local config
+data/
+images/
+thumbs/
+backups/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+.env
+.sdd/
+.openchamber/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

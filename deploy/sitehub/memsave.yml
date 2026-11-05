@@ -1,0 +1,32 @@
+# sitehub fragment for memsave.
+#
+# Paste this block into /srv/sitehub/traefik/dynamic/vpn-sites.yml on the
+# Ubuntu host (the file provider hot-reloads). Replace the host and the VPN
+# address with the real ones. sitehub does not expand ${...} in dynamic files.
+#
+# Two routers on purpose:
+#   - memsave       -> behind Cloudflare Access JWT verification
+#   - memsave-pwa   -> public manifest/icons so Google's WebAPK builder can
+#                      install the PWA without a session
+#
+# The same three paths also need a Bypass policy in Cloudflare Access:
+#   /manifest.webmanifest, /static/favicon.svg, /static/icons/*
+# Both layers are independent; without both, Android cannot install the PWA.
+
+http:
+  routers:
+    memsave:
+      rule: "Host(`memsave.example.com`)"
+      service: memsave
+      middlewares: [cf-access-verify@file]
+
+    memsave-pwa:
+      rule: "Host(`memsave.example.com`) && (Path(`/manifest.webmanifest`) || Path(`/static/favicon.svg`) || PathPrefix(`/static/icons/`))"
+      service: memsave
+      priority: 100
+
+  services:
+    memsave:
+      loadBalancer:
+        servers:
+          - url: "http://10.77.77.21:8780"

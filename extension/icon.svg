@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="memsave: download arrow">
+  <defs>
+    <linearGradient id="arrow" gradientUnits="userSpaceOnUse" x1="512" y1="120" x2="512" y2="930">
+      <stop offset="0" stop-color="#6d28d9"/>
+      <stop offset=".28" stop-color="#a855f7"/>
+      <stop offset=".5" stop-color="#ec4899"/>
+      <stop offset=".72" stop-color="#f97316"/>
+      <stop offset="1" stop-color="#eab308"/>
+    </linearGradient>
+    <filter id="glow-wide" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="38"/>
+    </filter>
+    <filter id="glow-tight" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="15"/>
+    </filter>
+  </defs>
+
+  <g transform="translate(512 512) scale(.9) translate(-512 -512)">
+    <path d="M 421 150
+             Q 421 120 451 120
+             L 573 120
+             Q 603 120 603 150
+             L 603 560
+             L 746 560
+             Q 782 560 762 590
+             L 540 900
+             Q 512 940 484 900
+             L 262 590
+             Q 242 560 278 560
+             L 421 560 Z"
+          fill="url(#arrow)" filter="url(#glow-wide)" opacity=".3"/>
+    <path d="M 421 150
+             Q 421 120 451 120
+             L 573 120
+             Q 603 120 603 150
+             L 603 560
+             L 746 560
+             Q 782 560 762 590
+             L 540 900
+             Q 512 940 484 900
+             L 262 590
+             Q 242 560 278 560
+             L 421 560 Z"
+          fill="url(#arrow)" filter="url(#glow-tight)" opacity=".42"/>
+    <path d="M 421 150
+             Q 421 120 451 120
+             L 573 120
+             Q 603 120 603 150
+             L 603 560
+             L 746 560
+             Q 782 560 762 590
+             L 540 900
+             Q 512 940 484 900
+             L 262 590
+             Q 242 560 278 560
+             L 421 560 Z"
+          fill="url(#arrow)"/>
+  </g>
+</svg>

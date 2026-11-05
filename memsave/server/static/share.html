@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#eef8ea">
+  <title>memsave — сохранение</title>
+  <script>
+    (function () {
+      var stored = localStorage.getItem("memsave_theme");
+      var dark = stored ? stored === "dark"
+        : !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = dark ? "#0f1712" : "#eef8ea";
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/style.css?v={{VERSION}}">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon-180.png">
+  <style>
+    .share-top { justify-content: space-between; }
+    .share-shell { min-height: calc(100vh - 64px); display: grid; place-items: center; padding: 24px 16px 80px; }
+    .share-card {
+      width: min(560px, 100%); padding: 30px 26px 26px; text-align: center;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 26px;
+      box-shadow: var(--shadow);
+    }
+    .share-mark { width: 74px; height: 74px; display: grid; place-items: center; margin: 0 auto 14px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); }
+    .share-mark svg { width: 38px; height: 38px; }
+    .share-mark.error { color: var(--danger); background: var(--danger-soft); }
+    .share-mark.success { color: var(--green); background: var(--green-soft); }
+    .share-card h1 { margin: 0 0 8px; font-size: 1.45rem; letter-spacing: -0.03em; }
+    .share-card p { margin: 0 auto; max-width: 430px; color: var(--muted); line-height: 1.6; font-size: 0.92rem; }
+    .share-preview { margin: 18px auto 0; max-width: 320px; overflow: hidden; border-radius: 16px; border: 1px solid var(--line); background: #0a0f0b; }
+    .share-preview img { display: block; width: 100%; max-height: 300px; object-fit: contain; }
+    .share-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 22px; }
+    .share-note { margin-top: 14px; color: var(--muted); font-size: 0.78rem; }
+    @media (max-width: 520px) { .share-shell { padding: 16px 10px 70px; } .share-card { padding: 24px 18px 20px; } }
+  </style>
+</head>
+<body>
+<header class="top share-top">
+  <a class="brand" href="/" aria-label="memsave — на главную">
+    <img class="brand-icon" src="/static/favicon.svg" alt="" width="32" height="32">
+    <span class="brand-name">memsave</span>
+  </a>
+  <button id="theme-btn" class="icon-btn" type="button" title="Светлая или тёмная тема" aria-label="Переключить тему">
+    <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+  </button>
+</header>
+
+<main class="share-shell">
+  <section class="share-card" aria-live="polite">
+    <div class="share-mark" id="share-mark" aria-hidden="true"></div>
+    <h1 id="share-title">Сохраняю…</h1>
+    <p id="share-text">Проверяю, что пришло из меню «Поделиться».</p>
+    <div class="share-preview" id="share-preview" hidden><img id="share-img" alt=""></div>
+    <div class="share-actions">
+      <a class="btn accent" href="/">Открыть архив</a>
+      <button class="btn ghost" id="share-retry" type="button" hidden>Повторить поиск</button>
+    </div>
+    <div class="share-note" id="share-note"></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const params = new URLSearchParams(location.search);
+  const titleEl = document.getElementById("share-title");
+  const textEl = document.getElementById("share-text");
+  const noteEl = document.getElementById("share-note");
+  const mark = document.getElementById("share-mark");
+  const preview = document.getElementById("share-preview");
+  const image = document.getElementById("share-img");
+  const retry = document.getElementById("share-retry");
+  const themeBtn = document.getElementById("theme-btn");
+  const themeIcon = document.getElementById("theme-icon");
+  const SUN = '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>';
+  const MOON = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+  const ICON_OK = '<path d="M20 6 9 17l-5-5"></path>';
+  const ICON_ERR = '<path d="M12 8v5M12 17h.01"></path><circle cx="12" cy="12" r="9"></circle>';
+  const ICON_CLOCK = '<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>';
+
+  function applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("memsave_theme", theme);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = theme === "dark" ? "#0f1712" : "#eef8ea";
+    themeIcon.innerHTML = theme === "dark" ? MOON : SUN;
+  }
+  applyTheme(document.documentElement.dataset.theme || "light");
+  themeBtn.addEventListener("click", () => applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+
+  function shape(kind, inner) {
+    mark.className = "share-mark " + kind;
+    mark.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + "</svg>";
+  }
+
+  function show(kind, title, text, note) {
+    shape(kind, kind === "error" ? ICON_ERR : kind === "success" ? ICON_OK : ICON_CLOCK);
+    titleEl.textContent = title;
+    textEl.textContent = text || "";
+    noteEl.textContent = note || "";
+  }
+
+  function showError(code) {
+    const messages = {
+      sw: ["Нужно установить приложение", "Чтобы отправлять картинки из меню «Поделиться», установите memsave как приложение: Chrome → меню → «Установить приложение». Затем повторите.", "После установки PWA пункт «memsave» появится в системном меню «Поделиться»."],
+      auth: ["Нужно войти в memsave", "Сессия Cloudflare Access истекла или ещё не открыта. Откройте memsave, войдите и повторите отправку.", ""],
+      empty: ["Нечего сохранять", "В меню «Поделиться» не пришло ни картинки, ни ссылки.", ""],
+      upload: ["Не удалось сохранить", "Сервер не принял картинку. Проверьте, что memsave запущен и доступен.", ""],
+      no_image: ["Картинка не найдена", "В ссылке не нашлось изображения для предпросмотра, поэтому ничего не добавлено.", ""],
+    };
+    const item = messages[code] || ["Не удалось сохранить", "Попробуйте ещё раз.", ""];
+    show("error", item[0], item[1], item[2]);
+  }
+
+  async function loadImage(id) {
+    try {
+      const response = await fetch(`/api/images/${id}`, { credentials: "same-origin" });
+      if (!response.ok) return false;
+      const item = await response.json();
+      const src = item.thumb_url || item.url;
+      if (src) {
+        image.src = src;
+        preview.hidden = false;
+      }
+      if (item.status === "pending") {
+        show("clock", "Сохранено", "AI размечает картинку в фоне. Можно закрыть страницу — теги появятся сами.", "Картинка уже в архиве.");
+        setTimeout(() => loadImage(id), 1800);
+        return true;
+      }
+      if (item.status === "failed") {
+        show("success", "Картинка сохранена", "AI не смог разметить её. Откройте архив и нажмите «Повторить AI», когда будет ключ.", "");
+        return true;
+      }
+      const tags = (item.tags || []).map((tag) => tag.name).slice(0, 5);
+      show("success", "Картинка сохранена", tags.length ? `Теги: ${tags.join(", ")}` : "AI не нашёл тегов, но картинка уже в архиве.", "");
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function pollJob(id) {
+    try {
+      const response = await fetch(`/api/jobs/${id}`, { credentials: "same-origin" });
+      if (!response.ok) throw new Error("job");
+      const job = await response.json();
+      if (job.status === "done") {
+        if (!job.image) {
+          showError("no_image");
+          retry.hidden = false;
+          return;
+        }
+        retry.hidden = true;
+        if (job.image.thumb_url || job.image.url) {
+          image.src = job.image.thumb_url || job.image.url;
+          preview.hidden = false;
+        }
+        show("success", "Картинка из ссылки сохранена", "Она уже в архиве; AI добавит теги в фоне.", "");
+        return;
+      }
+      if (job.status === "failed") {
+        showError("no_image");
+        retry.hidden = false;
+        return;
+      }
+      show("clock", "Ищу картинку", "Загружаю страницу и ищу изображение для предпросмотра, как это делают Slack, Telegram и X.", "Обычно это занимает несколько секунд.");
+      setTimeout(() => pollJob(id), 1400);
+    } catch {
+      showError("upload");
+    }
+  }
+
+  const imageId = Number(params.get("image") || 0);
+  const jobId = Number(params.get("job") || 0);
+  if (params.get("error")) {
+    showError(params.get("error"));
+  } else if (jobId) {
+    pollJob(jobId);
+  } else if (imageId) {
+    loadImage(imageId);
+  } else if (params.get("count")) {
+    show("success", `Сохранено: ${params.get("count")}`, "AI размечает картинки в фоне. Можно закрыть страницу — теги появятся сами.", "");
+  } else {
+    show("success", "Готово", "Откройте архив, чтобы увидеть сохранённое.", "");
+  }
+
+  retry.addEventListener("click", async () => {
+    const url = prompt("Вставьте ссылку с картинкой");
+    if (!url) return;
+    retry.hidden = true;
+    try {
+      const response = await fetch("/api/links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Memsave-Request": "1" },
+        body: JSON.stringify({ url }),
+        credentials: "same-origin",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "link");
+      location.search = `?status=link&job=${data.job_id}`;
+    } catch {
+      showError("upload");
+    }
+  });
+})();
+</script>
+</body>
+</html>

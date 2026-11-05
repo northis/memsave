@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>memsave — настройки расширения</title>
+  <style>
+    :root {
+      --bg: #eef8ea; --surface: #fff; --surface-2: #f7fcf5; --text: #17231b;
+      --muted: #617467; --line: rgba(37, 71, 45, .14); --accent: #6d28d9;
+      --accent-soft: #eee7ff; --accent-ink: #4c1d95; --green: #3f6b3a;
+      --green-soft: #dff0d8; --danger: #b42318; --danger-soft: #fee4e2;
+      --shadow: 0 14px 34px rgba(44, 82, 49, .12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; padding: 30px 18px;
+      color: var(--text); background: radial-gradient(circle at 8% 0%, #fff, transparent 30rem), linear-gradient(160deg, var(--bg), #e2f2dc);
+      font: 15px/1.5 "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+    }
+    .wrap { width: min(620px, 100%); margin: 0 auto; }
+    header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    header img { width: 44px; height: 44px; border-radius: 12px; }
+    header h1 { margin: 0; font-size: 1.35rem; letter-spacing: -.03em; }
+    header p { margin: 2px 0 0; color: var(--muted); font-size: .82rem; }
+    .panel { padding: 20px; margin-bottom: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); }
+    .panel h2 { margin: 0 0 10px; font-size: 1rem; }
+    label { display: block; margin-bottom: 6px; color: var(--muted); font-size: .82rem; font-weight: 650; }
+    input[type=url] { width: 100%; height: 42px; padding: 0 13px; color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; font: inherit; }
+    input[type=url]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    button { padding: 9px 14px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; font: inherit; font-size: .85rem; font-weight: 650; cursor: pointer; }
+    button:hover { border-color: var(--accent); color: var(--accent); }
+    button.primary { color: #fff; background: var(--accent); border-color: transparent; }
+    button.primary:hover { color: #fff; background: #8b5cf6; }
+    .status { min-height: 22px; margin-top: 12px; font-size: .84rem; color: var(--muted); }
+    .status.ok { color: var(--green); }
+    .status.error { color: var(--danger); }
+    .hint { margin: 10px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.55; }
+    .build { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: .78rem; }
+    .build a { color: var(--accent); }
+    code { padding: 1px 5px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; font-family: ui-monospace, Consolas, monospace; font-size: .84em; }
+    .success-box { padding: 10px 12px; color: var(--green); background: var(--green-soft); border-radius: 10px; font-size: .84rem; }
+    .error-box { padding: 10px 12px; color: var(--danger); background: var(--danger-soft); border-radius: 10px; font-size: .84rem; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="icon128.png" alt="">
+    <div>
+      <h1>memsave</h1>
+      <p>Расширение Chrome для отправки картинок в личный архив.</p>
+    </div>
+  </header>
+
+  <section class="panel">
+    <h2>Сервер</h2>
+    <label for="server">Адрес memsave</label>
+    <input id="server" type="url" placeholder="http://localhost:8780" autocomplete="off" spellcheck="false">
+    <div class="row">
+      <button class="primary" id="save" type="button">Сохранить</button>
+      <button id="test" type="button">Проверить соединение</button>
+      <button id="grant" type="button">Разрешить доступ к сайтам картинок</button>
+    </div>
+    <div class="status" id="status"></div>
+    <p class="hint">
+      Для доступа через Cloudflare Access сначала откройте memsave в браузере и войдите.
+      Пункт «Отправить в memsave» появится в контекстном меню при правом клике на картинке.
+      Если сайт картинки не даёт скачать файл, расширение попросит memsave получить превью по ссылке.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Версии</h2>
+    <div class="build">
+      <span>Расширение: <a id="ext-version" target="_blank" rel="noopener"></a></span>
+      <span id="server-build"></span>
+    </div>
+    <p class="hint">Версия сервера и короткий коммит приходят из <code>/api/version</code>.</p>
+  </section>
+</div>
+<script src="options.js"></script>
+</body>
+</html>
