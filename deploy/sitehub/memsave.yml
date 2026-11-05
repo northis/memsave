@@ -9,6 +9,12 @@
 #   - memsave-pwa   -> public manifest/icons so Google's WebAPK builder can
 #                      install the PWA without a session
 #
+# IMPORTANT: sitehub must run with CF_ACCESS_VERIFY_GLOBAL=false. In global
+# mode the websecure entrypoint attaches cf-access-verify@file to every
+# router, including memsave-pwa. Cloudflare Access does not add a JWT to
+# Bypass paths, so favicon/manifest requests then fail with
+# "missing Cf-Access-Jwt-Assertion header".
+#
 # The same three paths also need a Bypass policy in Cloudflare Access:
 #   /manifest.webmanifest, /static/favicon.svg, /static/icons/*
 # Both layers are independent; without both, Android cannot install the PWA.

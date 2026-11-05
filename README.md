@@ -219,6 +219,25 @@ Traefik-фрагмент содержит два router'а: основной с 
 без проверки JWT для manifest/icons. Оба уровня (Access Bypass и Traefik) нужны независимо:
 Android-установщик WebAPK скачивает manifest/icons без сессии.
 
+### Если `/static/favicon.svg` отдаёт 401 `missing Cf-Access-Jwt-Assertion`
+
+Это не ошибка проброса заголовка. Для Bypass-путей Cloudflare Access специально **не**
+добавляет `Cf-Access-Jwt-Assertion`, поэтому запрос должен идти в обход
+`cf-access-verify@file`. Если ошибка есть, значит verifier всё ещё применяется:
+
+1. В `.env` sitehub должно быть `CF_ACCESS_VERIFY_GLOBAL=false`. В глобальном режиме
+   middleware висит на entrypoint и применяется даже к `memsave-pwa`. После изменения:
+   `docker compose up -d` (Traefik пересоздастся).
+2. В `traefik/dynamic/vpn-sites.yml` основной router `memsave` должен иметь
+   `middlewares: [cf-access-verify@file]`, а `memsave-pwa` — **не** иметь middleware,
+   с `priority: 100` и rule из `deploy/sitehub/memsave.yml` (включая
+   `Path('/static/favicon.svg')`).
+3. В Cloudflare Access Bypass должны быть все три пути:
+   `/manifest.webmanifest`, `/static/favicon.svg`, `/static/icons/*`.
+
+`authRequestHeaders` в `access-verify.yml` уже содержит `Cf-Access-Jwt-Assertion`; для
+Bypass-путей его прокидывать не нужно и нельзя — их надо именно исключить из проверки.
+
 ## Версии и релизы
 
 Единый источник версии — `memsave/__init__.py`; `tools/bump_version.py` синхронизирует её с
