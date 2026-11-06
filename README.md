@@ -83,6 +83,7 @@ python -m memsave serve
 | `MEMSAVE_VISION_RETRIES` | `5` | максимум попыток |
 | `MEMSAVE_MAX_UPLOAD_MB` | `20` | максимум сырого файла |
 | `MEMSAVE_LINK_MAX_IMAGE_MB` | `20` | максимум картинки из ссылки |
+| `MEMSAVE_X_FALLBACK` | `1` | fallback X через публичный `api.fxtwitter.com`, если X недоступен |
 | `MEMSAVE_JOBS` | `1` | `0` отключает фоновые воркеры (тесты) |
 | `MEMSAVE_EMBEDDING_MODEL` | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | локальная модель эмбеддингов |
 | `MEMSAVE_SEMANTIC_MIN_SCORE` | `0.18` | минимальная cosine-близость для векторной выдачи |
@@ -121,10 +122,10 @@ python -m memsave serve
 - скачивает страницу с браузерным User-Agent;
 - читает `og:image`, `twitter:image`, `link rel=image_src`, JSON-LD;
 - при отсутствии — повторяет запрос с ботом-User-Agent;
-- для X/Twitter есть fallback через oEmbed;
 - для X/Twitter сначала читает публичный embed-syndication (`photos` / `mediaDetails`):
-  это даёт оригинальный URL фото и выбранный `/photo/N`, а если он недоступен — падает
-  обратно на `og:image`;
+  это даёт оригинальный URL фото и выбранный `/photo/N`; если X не отвечает — пробует
+  публичный `api.fxtwitter.com` (отключается `MEMSAVE_X_FALLBACK=0`), затем `og:image`
+  и oEmbed;
 - скачивает первую валидную картинку с `Referer` страницы;
 - блокирует private/loopback/link-local адреса, ограничивает редиректы, размер и время.
 

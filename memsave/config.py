@@ -58,6 +58,9 @@ LINK_MAX_HTML_BYTES = _int("MEMSAVE_LINK_MAX_HTML_MB", 3) * 1024 * 1024
 LINK_MAX_REDIRECTS = _int("MEMSAVE_LINK_MAX_REDIRECTS", 5)
 LINK_MAX_IMAGE_MB = _int("MEMSAVE_LINK_MAX_IMAGE_MB", 20)
 LINK_ALLOWED_PORTS = {80, 443}
+# X/Twitter fallback: the public fxtwitter API is used only when X's own
+# endpoints do not return media. Disable with MEMSAVE_X_FALLBACK=0.
+X_FALLBACK = _bool("MEMSAVE_X_FALLBACK", True)
 
 # Background jobs.
 JOBS_ENABLED = _bool("MEMSAVE_JOBS", True)

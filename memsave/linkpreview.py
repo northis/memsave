@@ -44,6 +44,7 @@ TWITTER_STATUS_RE = re.compile(
 )
 TWITTER_PHOTO_RE = re.compile(r"/photo/(\d+)", re.IGNORECASE)
 X_SYNDICATION_URL = "https://cdn.syndication.twimg.com/tweet-result"
+FX_TWITTER_URL = "https://api.fxtwitter.com/status/{tweet_id}"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".heic", ".heif"}
 
 
@@ -342,6 +343,54 @@ def _x_syndication_media(tweet_id: str) -> tuple[list[str], str | None]:
     return unique, title
 
 
+def _fxtwitter_media(tweet_id: str) -> tuple[list[str], str | None]:
+    """Last-resort X fallback through the public fxtwitter API."""
+    if not config.X_FALLBACK:
+        return [], None
+    try:
+        with httpx.Client(timeout=config.LINK_TIMEOUT, headers={"User-Agent": BROWSER_UA}) as client:
+            response = client.get(FX_TWITTER_URL.format(tweet_id=tweet_id))
+        if response.status_code != 200:
+            return [], None
+        data = response.json()
+    except (httpx.HTTPError, ValueError, TypeError):
+        return [], None
+    if not isinstance(data, dict):
+        return [], None
+    tweet = data.get("tweet")
+    if not isinstance(tweet, dict):
+        return [], None
+    media = tweet.get("media")
+    if not isinstance(media, dict):
+        return [], None
+
+    urls: list[str] = []
+    for item in media.get("photos") or []:
+        if isinstance(item, dict) and isinstance(item.get("url"), str):
+            urls.append(item["url"])
+    for item in media.get("all") or []:
+        if (
+            isinstance(item, dict)
+            and item.get("type") == "photo"
+            and isinstance(item.get("url"), str)
+        ):
+            urls.append(item["url"])
+    unique: list[str] = []
+    for value in urls:
+        if value.startswith(("http://", "https://")) and value not in unique:
+            unique.append(value)
+
+    title = tweet.get("text")
+    if isinstance(title, str):
+        title = " ".join(URL_RE.sub("", title).split())[:300] or None
+        author = tweet.get("author")
+        if title and isinstance(author, dict) and isinstance(author.get("name"), str):
+            title = f"{author['name']}: {title}"[:300]
+    else:
+        title = None
+    return unique, title
+
+
 def resolve(url: str, *, title_hint: str | None = None) -> Resolved:
     url = url.strip()
     if not url:
@@ -351,6 +400,9 @@ def resolve(url: str, *, title_hint: str | None = None) -> Resolved:
     if tweet is not None:
         tweet_id, photo_index = tweet
         photos, tweet_title = _x_syndication_media(tweet_id)
+        if not photos:
+            photos, fallback_title = _fxtwitter_media(tweet_id)
+            tweet_title = tweet_title or fallback_title
         if photos:
             if photo_index and 1 <= photo_index <= len(photos):
                 photos = [photos[photo_index - 1]] + [

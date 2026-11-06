@@ -87,6 +87,71 @@ def test_x_syndication_media_parses_original_photos(monkeypatch):
     assert title == "Автор: Высокая плотность тела"
 
 
+def test_fxtwitter_fallback_parses_original_photo(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {
+                "tweet": {
+                    "text": "Высокая плотность тела",
+                    "author": {"name": "Автор"},
+                    "media": {
+                        "photos": [
+                            {"type": "photo", "url": "https://pbs.twimg.com/media/a.jpg?name=orig"}
+                        ],
+                        "all": [
+                            {"type": "video", "url": "https://video.twimg.com/a.mp4"},
+                            {"type": "photo", "url": "https://pbs.twimg.com/media/a.jpg?name=orig"},
+                        ],
+                    },
+                }
+            }
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def get(self, url):
+            return FakeResponse()
+
+    monkeypatch.setattr(linkpreview.httpx, "Client", FakeClient)
+    monkeypatch.setattr(linkpreview.config, "X_FALLBACK", True)
+    urls, title = linkpreview._fxtwitter_media("123")
+    assert urls == ["https://pbs.twimg.com/media/a.jpg?name=orig"]
+    assert title == "Автор: Высокая плотность тела"
+
+
+def test_x_syndication_failure_falls_back_to_fxtwitter(monkeypatch):
+    monkeypatch.setattr(linkpreview, "_x_syndication_media", lambda tweet_id: ([], None))
+    monkeypatch.setattr(
+        linkpreview,
+        "_fxtwitter_media",
+        lambda tweet_id: (["https://pbs.twimg.com/media/fallback.jpg"], "Автор: текст"),
+    )
+    monkeypatch.setattr(
+        linkpreview,
+        "_download_image",
+        lambda url, referer: linkpreview.Resolved(
+            data=b"image",
+            media_type="image/jpeg",
+            image_url=url,
+            page_url=referer,
+            title=None,
+        ),
+    )
+    resolved = linkpreview.resolve("https://x.com/user/status/123")
+    assert resolved.image_url == "https://pbs.twimg.com/media/fallback.jpg"
+    assert resolved.title == "Автор: текст"
+
+
 def test_x_syndication_prefers_selected_original_photo(monkeypatch):
     monkeypatch.setattr(
         linkpreview,
