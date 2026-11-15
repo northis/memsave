@@ -33,6 +33,9 @@ def _serve(args: argparse.Namespace) -> int:
 
 def _backup(args: argparse.Namespace) -> int:
     result = backup.run_backup(full=bool(args.full))
+    if result["skipped"]:
+        print(f"nothing changed since {result['previous_backup_utc'] or 'never'}; no backup")
+        return 0
     print(f"backup: {result['path']}")
     print(
         f"images: {result['images']}, thumbs: {result['thumbs']}, "

@@ -15,7 +15,7 @@ def test_home_version_and_pwa_assets(client):
     assert "app.js?v=" in root.text
     assert client.get("/health").json() == {"status": "ok"}
     version = client.get("/api/version").json()
-    assert version["version"] == "1.0.3"
+    assert version["version"] == "1.0.4"
     manifest = client.get("/manifest.webmanifest")
     assert manifest.status_code == 200
     assert "application/manifest+json" in manifest.headers["content-type"]

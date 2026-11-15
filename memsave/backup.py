@@ -42,6 +42,8 @@ def _write_state(path: Path, data: dict[str, Any]) -> None:
 
 
 def _iso_now() -> str:
+    # Whole seconds: the state time is a watermark with a little slack, so a file the
+    # filesystem timestamps a few milliseconds "before" the run start is not missed.
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
@@ -72,6 +74,17 @@ def _files_since(directory: Path, last_ts: float, *, full: bool) -> list[Path]:
     return result
 
 
+def _db_changed_since(last_ts: float) -> bool:
+    """The DB or its WAL was written after the last backup, so it needs a fresh copy."""
+    for path in (config.DB_PATH, config.DB_PATH.with_name(f"{config.DB_PATH.name}-wal")):
+        try:
+            if path.stat().st_mtime > last_ts:
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def _backup_name(full: bool) -> str:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     prefix = "memsave_full" if full else "memsave_backup"
@@ -88,6 +101,9 @@ def _backup_name(full: bool) -> str:
 def run_backup(*, full: bool = False) -> dict[str, Any]:
     paths = _paths()
     config.ensure_dirs()
+    # The state keeps the moment the scan started, not the moment the zip was finished:
+    # a file written while the archive is being built is picked up by the next run.
+    started = _iso_now()
     state = _read_state(paths["state"])
     last_backup_utc = state.get("last_backup_utc")
     last_ts = 0.0
@@ -102,6 +118,19 @@ def run_backup(*, full: bool = False) -> dict[str, Any]:
     part = target.with_name(target.name + ".part")
     images = _files_since(paths["images"], last_ts, full=full)
     thumbs = _files_since(paths["thumbs"], last_ts, full=full)
+    if not full and not images and not thumbs and not _db_changed_since(last_ts):
+        # Nothing to pack, and the state keeps pointing at the last archive that exists.
+        return {
+            "path": None,
+            "name": None,
+            "full": False,
+            "images": 0,
+            "thumbs": 0,
+            "previous_backup_utc": last_backup_utc,
+            "backup_utc": last_backup_utc,
+            "size_bytes": 0,
+            "skipped": True,
+        }
 
     snapshot_path: Path | None = None
     try:
@@ -131,11 +160,10 @@ def run_backup(*, full: bool = False) -> dict[str, Any]:
             except OSError:
                 pass
 
-    finished = _iso_now()
     _write_state(
         paths["state"],
         {
-            "last_backup_utc": finished,
+            "last_backup_utc": started,
             "last_backup_zip": name,
             "last_full": full,
         },
@@ -147,8 +175,9 @@ def run_backup(*, full: bool = False) -> dict[str, Any]:
         "images": len(images),
         "thumbs": len(thumbs),
         "previous_backup_utc": last_backup_utc,
-        "backup_utc": finished,
+        "backup_utc": started,
         "size_bytes": target.stat().st_size,
+        "skipped": False,
     }
 
 

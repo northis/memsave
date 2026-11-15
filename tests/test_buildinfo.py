@@ -5,9 +5,9 @@ from memsave import buildinfo
 
 def test_build_info_shape():
     info = buildinfo.build_info()
-    assert info["version"] == "1.0.3"
-    assert info["tag"] == "v1.0.3"
-    assert str(info["tag_url"]).endswith("/releases/tag/v1.0.3")
+    assert info["version"] == "1.0.4"
+    assert info["tag"] == "v1.0.4"
+    assert str(info["tag_url"]).endswith("/releases/tag/v1.0.4")
 
 
 def test_repo_url_normalization():
